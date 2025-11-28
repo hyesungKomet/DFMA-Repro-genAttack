@@ -7,7 +7,7 @@ import torch.utils.data as Data
 from torch.utils.data import DataLoader
 
 ngpu = 1
-device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else 'cpu')
+device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else ('mps' if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else 'cpu'))
 
 
 class DeconvNet(nn.Module):
@@ -281,7 +281,7 @@ def test_accuracy(model, testloader):
     with torch.no_grad():
         for data in testloader:
             images, labels = data
-            images, labels=images.cuda(), labels.cuda()
+            images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -297,15 +297,26 @@ def get_vggmodel():
     return vgg16
 
 
+def get_resnet18model():
+    from torchvision.models import resnet18
+    resnet = resnet18(pretrained=True)
+    for param in resnet.parameters():
+        param.requires_grad = True
+    # Replace final FC layer for 10 classes (CIFAR-10)
+    num_features = resnet.fc.in_features
+    resnet.fc = nn.Linear(num_features, 10)
+    return resnet
+
+
 def calculate_agreement_accuracy(one_model,two_model,one_dataloader):
-    one_model.cuda()
+    one_model.to(device)
     one_model.eval()
     two_model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
         for images, labels in one_dataloader:
-            images, labels = images.cuda(), labels.cuda()
+            images, labels = images.to(device), labels.to(device)
             outputs = one_model(images)
             ano_outputs=two_model(images)
             _, predicted = torch.max(outputs.data, 1)
@@ -336,8 +347,8 @@ def train_baseline(s_model,s_optimizer,my_loader,epochs):
         running_loss = 0.0
         for i, data in enumerate(my_loader, 0):
             inputs, labels = data
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             s_optimizer.zero_grad()
             outputs = s_model(inputs)
             loss = criterion(outputs, labels)
@@ -368,8 +379,8 @@ def train_shadow(s_model,s_optimizer,my_loader,epochs):
         running_loss = 0.0
         for i, data in enumerate(my_loader, 0):
             inputs, labels = data
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             s_optimizer.zero_grad()
             outputs = s_model(inputs)
             loss = criterion(outputs, labels)
@@ -515,10 +526,10 @@ def get_meta_baseline(onemoel,oneloader,label):
     with torch.no_grad():
         for k, data in enumerate(oneloader, 0):
             inputs, labels = data
-            inputs,labels = inputs.cuda(),labels.cuda()
+            inputs, labels = inputs.to(device), labels.to(device)
             outputs = onemoel(inputs)
             for i in range(len(outputs)):
-                temp=torch.cat((outputs[i], torch.Tensor([labels[i]]).cuda()), dim=0).unsqueeze(1)
+                temp = torch.cat((outputs[i], torch.tensor([labels[i]], device=device)), dim=0).unsqueeze(1)
                 if member_data is not None:
                     member_data = torch.cat((member_data, temp),dim=1)
                 else:
@@ -535,11 +546,10 @@ def get_meta_data(onemoel,oneloader,label):
         for k, data in enumerate(oneloader, 0):
             inputs, labels = data
             _, idx_labels = torch.max(labels.data, 1)
-            inputs,idx_labels = inputs.cuda(),idx_labels.cuda()
+            inputs, idx_labels = inputs.to(device), idx_labels.to(device)
             outputs = onemoel(inputs)
             for i in range(len(outputs)):
-                #print(outputs[i].shape,torch.Tensor([labels[i]]).shape)
-                temp=torch.cat((outputs[i], torch.Tensor([idx_labels[i]]).cuda()), dim=0).unsqueeze(1)
+                temp = torch.cat((outputs[i], torch.tensor([idx_labels[i]], device=device)), dim=0).unsqueeze(1)
                 if member_data is not None:
                     member_data = torch.cat((member_data, temp),dim=1)
                 else:
