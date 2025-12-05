@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision.models import vgg19
+from torchvision.models import vgg16, vgg19
 from sklearn.metrics import f1_score
 import numpy as np
 import torch.utils.data as Data
@@ -289,12 +289,12 @@ def test_accuracy(model, testloader):
     return 100 * correct / total
 
 def get_vggmodel():
-    vgg16 = vgg19(pretrained=True)
-    for param in vgg16.parameters():
+    vgg = vgg16(pretrained=True)
+    for param in vgg.parameters():
         param.requires_grad = True
-    num_features = vgg16.classifier[6].in_features
-    vgg16.classifier[6] = nn.Linear(num_features, 10)
-    return vgg16
+    num_features = vgg.classifier[6].in_features
+    vgg.classifier[6] = nn.Linear(num_features, 10)
+    return vgg
 
 
 def get_resnet18model():
