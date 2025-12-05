@@ -18,7 +18,7 @@ from utils_cifar import *
 
 # Argument parser
 parser = argparse.ArgumentParser(description="Train victim model (VGG19 or ResNet18) on CIFAR-10")
-parser.add_argument('--model', type=str, default='vgg19', choices=['vgg19', 'resnet18'],
+parser.add_argument('--model', type=str, default='vgg19', choices=['vgg19', 'resnet18', 'vgg16'],
                     help='Model architecture to use (default: vgg19)')
 parser.add_argument('--epochs', type=int, default=10, help='Number of epochs (default: 10)')
 parser.add_argument('--batch-size', type=int, default=32, help='Batch size (default: 32)')
@@ -35,7 +35,7 @@ print(f"Model: {args.model}, Epochs: {args.epochs}, Batch size: {args.batch_size
 # load data set
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0, 0, 0), (1, 1, 1))
+    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 ])
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True)
@@ -43,7 +43,7 @@ testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True
 testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False)
 
 # load model based on argument and move to device
-if args.model == 'vgg19':
+if args.model == 'vgg16':
     model = get_vggmodel().to(device)
 elif args.model == 'resnet18':
     model = get_resnet18model().to(device)
@@ -51,9 +51,20 @@ else:
     raise ValueError(f"Unknown model: {args.model}")
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+# optimizer = optim.SGD(
+#     model.parameters(),
+#     lr=0.01,
+#     momentum=0.9,
+#     weight_decay=5e-4
+# )
+# scheduler = optim.lr_scheduler.MultiStepLR(
+#     optimizer,
+#     milestones=[15, 25],  # total epoch=30
+#     gamma=0.1
+# )
 
 # results directory (organized by model name)
-results_dir = Path("results") / args.model
+results_dir = Path("results") / f'{args.model}_victim'
 results_dir.mkdir(parents=True, exist_ok=True)
 
 # CSV log file
@@ -63,6 +74,10 @@ with open(log_path, 'w', newline='') as csvfile:
     writer.writerow(["epoch", "train_loss", "test_accuracy"])  # header
 
 # training loop with tqdm
+best_acc = 0.0
+best_state = None
+patience = 10  # patience
+wait = 0       # patience counter
 epochs = args.epochs
 train_losses = []
 test_accuracies = []
@@ -95,14 +110,33 @@ for epoch in range(epochs):
         writer.writerow([epoch + 1, epoch_loss, accuracy])
 
     print(f"Epoch {epoch+1}, Loss: {epoch_loss:.4f}, Test Accuracy: {accuracy:.2f}%")
+    # -------------------------------
+    # Early Stopping + Best Model Save
+    # -------------------------------
+    if accuracy > best_acc:
+        best_acc = accuracy
+        best_state = model.state_dict()
+        wait = 0
 
-# save model (state_dict) and full model for convenience
-torch.save(model.state_dict(), results_dir / f'{args.model}_victim_cifar10_state.pt')
-try:
-    torch.save(model, results_dir / f'{args.model}_victim_cifar10_full.pt')
-except Exception:
-    # saving full model may fail for some setups; state_dict is primary
-    pass
+        torch.save(best_state, results_dir / f"{args.model}_victim_cifar10_state.pt")
+        print(f"[BEST] Updated best model at epoch {epoch+1} — Acc: {best_acc:.2f}%")
+
+    else:
+        wait += 1
+        print(f"[INFO] No improvement. Patience: {wait}/{patience}")
+
+    if wait >= patience:
+        print(f"[EARLY STOP] Stopped at epoch {epoch+1} — Best Acc: {best_acc:.2f}%")
+        break
+
+
+# # save model (state_dict) and full model for convenience
+# torch.save(model.state_dict(), results_dir / f'{args.model}_victim_cifar10_state.pt')
+# try:
+#     torch.save(model, results_dir / f'{args.model}_victim_cifar10_full.pt')
+# except Exception:
+#     # saving full model may fail for some setups; state_dict is primary
+#     pass
 
 # plot losses and accuracies
 plt.figure(figsize=(10, 4))
@@ -125,3 +159,4 @@ plt.savefig(results_dir / f'{args.model}_train_plots.png', dpi=100)
 plt.close()
 
 print(f'Finished Training [{args.model}] — artifacts saved in {results_dir}')
+print(f"Finished Training — Best accuracy: {best_acc:.2f}%")

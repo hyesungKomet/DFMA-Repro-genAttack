@@ -1,0 +1,5 @@
+Best epoch: 20
+Best test accuracy: 58.1000
+Best agreement: 59.3400
+Monitor metric: agreement
+Patience: 7
