@@ -39,7 +39,7 @@ def calculate_test_accuracy(model, data_loader):
         for images, labels in data_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
-            predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs.data, 1)
             #_, labels = torch.max(labels.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
@@ -110,28 +110,33 @@ def calculate_tpr_fpr(model, my_loader, device='cuda:0'):
     return correct_result,result
 
 
-def get_meta_data(onemoel,oneloader,label):
+def get_meta_data(onemoel, oneloader, label):
     member_data = None
-    onemoel=onemoel.cuda()
+    onemoel = onemoel.cuda()
     onemoel.eval()
     with torch.no_grad():
         for i, data in enumerate(oneloader, 0):
             inputs, labels = data
             inputs = inputs.cuda()
             outputs = onemoel(inputs)
-            #if labels.dim() > 1:
-                #_, labels = torch.max(labels.data, 1)
+            
+            # FIX: Apply softmax to prevent NaN
+            outputs = torch.softmax(outputs, dim=1)
+            
             for j in range(len(outputs)):
-                temp=torch.cat((outputs[j], torch.Tensor([labels[j]]).cuda()), dim=0).unsqueeze(1)
+                temp = torch.cat((outputs[j], torch.Tensor([labels[j]]).cuda()), dim=0).unsqueeze(1)
                 if member_data is not None:
-                    member_data = torch.cat((member_data, temp),dim=1)
+                    member_data = torch.cat((member_data, temp), dim=1)
                 else:
-                    member_data=temp
+                    member_data = temp
     print(member_data.shape)
     member_data = member_data.transpose(0, 1)
     member_label = [label] * len(member_data)
     member_label = torch.FloatTensor(np.array(member_label))
-    return member_data,member_label
+    return member_data, member_label
+
+# Also change optimizer
+meta_optimizer = optim.Adam(meta_model.parameters(), lr=0.001)  # Instead of SGD with lr=0.1
 
 def find_kth_largest(arr, k):
     arr_sorted = sorted(arr, reverse=True)
@@ -196,7 +201,7 @@ optimizer2 = optim.SGD(shadow2.parameters(), lr=0.02)
 train_shadow(shadow1,optimizer1,new_train_loader,15)
 train_shadow(shadow2,optimizer2,new_train_loader,15)
 calculate_test_accuracy(shadow1,new_test_loader)
-calculate_test_accuracy(shadow1,new_test_loader)
+calculate_test_accuracy(shadow2,new_test_loader)
 
 # Collect training meta-dataset
 meta_data,meta_label=None,None
