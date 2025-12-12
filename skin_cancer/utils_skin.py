@@ -2,11 +2,15 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.utils.data as Data
-from torchvision.models import vgg19
+from torchvision.models import vgg16
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device(
+    "cuda" if torch.cuda.is_available()
+    else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+)
+# device='cpu'
 
 class Decoder(nn.Module):
     def __init__(self, nc=3, ngf=64):
@@ -141,12 +145,12 @@ class TwoMetaAttack(nn.Module):
         return x
 
 def get_vggmodel():
-    vgg16 = vgg19(pretrained=True)
-    for param in vgg16.parameters():
+    model = vgg16(pretrained=True)
+    for param in model.parameters():
         param.requires_grad = True
-    num_features = vgg16.classifier[6].in_features
-    vgg16.classifier[6] = nn.Linear(num_features, 2)
-    return vgg16
+    num_features = model.classifier[6].in_features
+    model.classifier[6] = nn.Linear(num_features, 2)
+    return model
 
 def get_testacc(model,val_loader,criterion):
     model.eval()
@@ -179,23 +183,29 @@ def calculate_test_accuracy(model, data_loader):
     accuracy = 100 * correct / total
     print('Accuracy:',accuracy)
 
-def calculate_agreement_accuracy(one_model,two_model,one_dataloader):
-    one_model.cuda()
+def calculate_agreement_accuracy(one_model, two_model, one_dataloader):
+    # (cuda / mps / cpu)
+    one_model.to(device)
+    two_model.to(device)
     one_model.eval()
     two_model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
         for images, labels in one_dataloader:
-            images, labels = images.cuda(), labels.cuda()
+            images = images.to(device)
+            # labels
+            labels = labels.to(device)
+
             outputs = one_model(images)
-            ano_outputs=two_model(images)
+            ano_outputs = two_model(images)
+
             _, predicted = torch.max(outputs.data, 1)
             _, ano_predicted = torch.max(ano_outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == ano_predicted).sum().item()
     accuracy = 100 * correct / total
-    print('Agreement:',accuracy)
+    print('Agreement:', accuracy)
 
 def random_partation(one_data,one_label):
     indices = torch.randperm(one_data.size(0))
@@ -220,8 +230,8 @@ def train_shadow(s_model,s_optimizer,s_criterion,my_loader,epochs):
         running_loss = 0.0
         for i, data in enumerate(my_loader, 0):
             inputs, labels = data
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             s_optimizer.zero_grad()
             outputs = s_model(inputs)
             loss = s_criterion(outputs, labels)
@@ -236,8 +246,8 @@ def train_victim(s_model,s_optimizer,s_criterion,my_loader,epochs):
         running_loss = 0.0
         for i, data in enumerate(my_loader, 0):
             inputs, labels = data
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             s_optimizer.zero_grad()
             outputs = s_model(inputs)
             loss = s_criterion(outputs, labels)
@@ -250,7 +260,7 @@ def find_kth_largest(arr, k):
     arr_sorted = sorted(arr, reverse=True)
     return arr_sorted[k-1]
 
-def calculate_tpr_fpr(model, my_loader, device='cuda:0'):
+def calculate_tpr_fpr(model, my_loader, device=device):
     model.eval()  # 设置模型为评估模式
     correct_result=[]
     result=[]
@@ -277,10 +287,10 @@ def get_meta_baseline(onemoel,oneloader,label):
     with torch.no_grad():
         for k, data in enumerate(oneloader, 0):
             inputs, labels = data
-            inputs,labels = inputs.cuda(),labels.cuda()
+            inputs,labels = inputs.to(device),labels.to(device)
             outputs = onemoel(inputs)
             for i in range(len(outputs)):
-                temp=torch.cat((outputs[i], torch.Tensor([labels[i]]).cuda()), dim=0).unsqueeze(1)
+                temp=torch.cat((outputs[i], torch.Tensor([labels[i]]).to(device)), dim=0).unsqueeze(1)
                 if member_data is not None:
                     member_data = torch.cat((member_data, temp),dim=1)
                 else:
@@ -297,11 +307,11 @@ def get_meta_data(onemoel,oneloader,label):
         for k, data in enumerate(oneloader, 0):
             inputs, labels = data
             _, idx_labels = torch.max(labels.data, 1)
-            inputs,idx_labels = inputs.cuda(),idx_labels.cuda()
+            inputs,idx_labels = inputs.to(device),idx_labels.to(device)
             outputs = onemoel(inputs)
             for i in range(len(outputs)):
                 #print(outputs[i].shape,torch.Tensor([labels[i]]).shape)
-                temp=torch.cat((outputs[i], torch.Tensor([idx_labels[i]]).cuda()), dim=0).unsqueeze(1)
+                temp=torch.cat((outputs[i], torch.Tensor([idx_labels[i]]).to(device)), dim=0).unsqueeze(1)
                 if member_data is not None:
                     member_data = torch.cat((member_data, temp),dim=1)
                 else:
@@ -326,7 +336,7 @@ def calculate_test_accuracy(model, data_loader):
     print(accuracy)
 
 from sklearn.metrics import roc_curve, auc
-def calculate_roc_auc(model, my_loader, device='cuda:0'):
+def calculate_roc_auc(model, my_loader, device=device):
     model.eval()  # 设置模型为评估模式
     true_labels = []
     predictions = []
@@ -345,7 +355,7 @@ def calculate_roc_auc(model, my_loader, device='cuda:0'):
 
 from sklearn.metrics import f1_score
 
-def calculate_f1(model, data_loader, device='cuda:0', threshold=0.5, average='binary'):
+def calculate_f1(model, data_loader, device=device, threshold=0.5, average='binary'):
     model.eval()
     true_labels = []
     predictions = []
@@ -359,7 +369,7 @@ def calculate_f1(model, data_loader, device='cuda:0', threshold=0.5, average='bi
     f1 = f1_score(true_labels, predictions, average=average)
     print(f'F1 Score: {f1:.4f}')
 
-def calculate_btest_accuracy(model, my_loader, device='cuda:0'):
+def calculate_btest_accuracy(model, my_loader, device=device):
     model.eval()  # 设置模型为评估模式
     correct = 0
     total = 0

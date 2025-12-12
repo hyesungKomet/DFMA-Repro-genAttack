@@ -1,0 +1,5 @@
+Best epoch: 88
+Best agreement: 81.0000%
+Final epoch: 100
+Final val accuracy: 78.8000%
+Final val loss: 0.6789

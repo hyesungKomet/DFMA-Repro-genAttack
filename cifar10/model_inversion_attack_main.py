@@ -21,9 +21,23 @@ def get_output(one_model,test_img):
         fc1_output = one_model.classifier[0](pooled_output)
     return fc1_output
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device(
+    "cuda" if torch.cuda.is_available()
+    else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+)
+victim_builder = get_vggmodel
+victim_path = './results/vgg16_victim/vgg16_victim_cifar10_state.pt'
+try:
+    victim_obj = torch.load(victim_path, map_location=device)
+    if isinstance(victim_obj, dict):
+        victim_model = victim_builder()
+        victim_model.load_state_dict(victim_obj)
+    else:
+        victim_model = victim_obj
+except Exception:
+    # fallback: try loading to CPU then move
+    victim_model = torch.load(victim_path, map_location='cpu')
 
-victim_model=torch.load('victim_model.pt')
 victim_model = victim_model.to(device)
 victim_model.eval()
 
@@ -31,7 +45,7 @@ transform = transforms.Compose([transforms.Resize((32,32)), transforms.ToTensor(
                                 transforms.Normalize((0,0,0),(1,1,1))])
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
-train_dataset = datasets.ImageFolder(root='./gene', transform=transform)
+train_dataset = datasets.ImageFolder(root='./generated_data_SD1.5', transform=transform)
 
 
 test_img=None
@@ -48,30 +62,31 @@ orignial_img=orignial_img.permute(1, 2, 0)
 plt.imshow(orignial_img.cpu().detach().numpy())
 plt.show()
 
-# old_data=torch.load('generated_data.pt')
-# old_dataset=Data.TensorDataset(old_data,old_data)
-#
-# new_data=None
-# new_label=None
-# for idx,(image,_) in enumerate(old_dataset):
-#     if idx%2==0:
-#         continue
-#     temp = image.reshape(1, 3, 32, 32)
-#     temp=temp.to(device)
-#     temp_feat = get_output(victim_model, temp)
-#     if new_label is not None:
-#         new_data=torch.cat((new_data, temp), dim=0)
-#         new_label=torch.cat((new_label,temp_feat),dim=0)
-#     else:
-#         new_data=temp
-#         new_label=temp_feat
-#
-# print(new_data.shape,new_label.shape)
-# torch.save(new_data,'reverse_data.pt')
-# torch.save(new_label,'reverse_label.pt')
+# save first
+old_data=torch.load('./stealing_set/SD1.5/vgg16_False/generated_data.pt')
+old_dataset=Data.TensorDataset(old_data,old_data)
 
-new_data=torch.load('reverse_data.pt')
-new_label=torch.load('reverse_label.pt')
+new_data=None
+new_label=None
+for idx,(image,_) in enumerate(old_dataset):
+    if idx%2==0:
+        continue
+    temp = image.reshape(1, 3, 32, 32)
+    temp=temp.to(device)
+    temp_feat = get_output(victim_model, temp)
+    if new_label is not None:
+        new_data=torch.cat((new_data, temp), dim=0)
+        new_label=torch.cat((new_label,temp_feat),dim=0)
+    else:
+        new_data=temp
+        new_label=temp_feat
+
+print(new_data.shape,new_label.shape)
+torch.save(new_data,'./stealing_set/SD1.5/vgg16_False/reverse_data.pt')
+torch.save(new_label,'./stealing_set/SD1.5/vgg16_False/reverse_label.pt')
+
+new_data=torch.load('./stealing_set/SD1.5/vgg16_False/reverse_data.pt')
+new_label=torch.load('./stealing_set/SD1.5/vgg16_False/reverse_label.pt')
 print(new_data.shape,new_label.shape)
 reverse_dataset=Data.TensorDataset(new_data,new_label)
 reverse_loader = DataLoader(reverse_dataset, batch_size=64, shuffle=True)

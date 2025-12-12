@@ -7,7 +7,7 @@ nz = 100
 ngf = 64
 ndf = 64
 num_classes = 10
-device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else 'cpu')
+device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else ('mps' if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else 'cpu'))
 
 
 class CNN(nn.Module):
