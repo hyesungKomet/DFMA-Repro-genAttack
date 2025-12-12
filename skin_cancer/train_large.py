@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import torchvision.utils as vutils
+from tqdm import tqdm
 
 
 def show_generated_images(images):

@@ -5,23 +5,35 @@
 *.model
 
 # image files
-*.png
+#*.png
 *.jpg
 *.jpeg
 *.gif
 *.bmp
 *.tiff
 *.webp
+**/images/
 
 # image directories
+cifar10/data/
 cifar10/generated_data (stable_diffusion)/
+cifar10/generated_data_SD1.5/
+cifar10/generated_data_SDXL/
+mnist/data/
+mnist/generated_data_GAN/
+skin_cancer/melanoma_cancer_dataset/
+skin_cancer/generated_data_GAN/
+skin_cancer/generated_data_Irfan/
+skin_cancer/generated_samples/
+skin_cancer/gen_benign/
+skin_cancer/gen_malignant/
 generated_demo/generated_data (stable_diffusion)/
 generated_demo/generated_data (openjourney)/
 private_pet/gen/
 
 # Text
 text/
-*.csv
+#*.csv
 
 # PET
 private_pet/

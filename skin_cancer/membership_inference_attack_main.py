@@ -6,7 +6,11 @@ from utils_skin import *
 
 ngpu = 1
 batch_size=64
-device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else 'cpu')
+# device = torch.device('cuda:0' if (torch.cuda.is_available() and ngpu > 0) else 'cpu')
+device = torch.device(
+    "cuda" if torch.cuda.is_available()
+    else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+)
 
 transform = transforms.Compose([
     transforms.Resize([64, 64]),
@@ -32,8 +36,8 @@ test_dataloader = DataLoader(
     shuffle=False
 )
 
-generate_imgs=torch.load('generated_data.pt')
-generate_labs=torch.load('generated_label.pt')
+generate_imgs=torch.load('./stealing_set_GAN/filtered_data.pt')
+generate_labs=torch.load('./stealing_set_GAN/filtered_label.pt')
 
 victim_model = get_vggmodel().to(device)
 
@@ -43,8 +47,8 @@ optimizer1 = optim.SGD(shadow1.parameters(), lr=1e-5,momentum=0.9)
 optimizer2 = optim.SGD(shadow2.parameters(), lr=2e-5,momentum=0.9)
 my_criterion=nn.MSELoss()
 
-new_data=torch.load('generated_data.pt')
-new_label=torch.load('generated_label.pt')
+new_data=torch.load('./stealing_set_GAN/filtered_data.pt')
+new_label=torch.load('./stealing_set_GAN/filtered_label.pt')
 
 train_one_loader,test_one_loader=random_partation(new_data,new_label)
 train_two_loader,test_two_loader=random_partation(new_data,new_label)
