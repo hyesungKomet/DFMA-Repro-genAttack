@@ -8,7 +8,7 @@ Open-source LLMs can not generate hand-writing digits, thereby we train a genera
 ```
 python3 train_victim_model.py
 ```
-After execution, you get the victim model 'victim_mnist_model.pt'.
+After execution, you get the victim model on `./results/cnn`.
 
 ### Step 1: Prepare the (large) generative model
 ```
@@ -22,11 +22,11 @@ python3 enhancement_model.py
 ```
 You can download an autoencoder, or train an autoencoder on the emnist, thus getting 'autoencoder.pt'.
 
-### Step 3: Generate data points with augmentation
+### Step 3: Generate data points with augmentation & filtering
 ```
-python3 generate_data.py
+python3 create_stealing_set.py
 ```
-After execution, you get the generated dataset 'generated_data.pt' and 'generated_label.pt'.
+After execution, you get the generated dataset 'generated_data.pt' and 'generated_label.pt' in `./stealing_set_GAN`.
 
 ## Three privacy attacks based on the generated dataset
 
@@ -34,7 +34,7 @@ After execution, you get the generated dataset 'generated_data.pt' and 'generate
 ```
 python3 model_extraction_attack_main.py
 ```
-After execution, you get the stealing model 'steal_model.pt'.
+After execution, you get the stealing model in `./results/cnn`
 
 ### Attack 1: membership inference
 ```
@@ -44,7 +44,7 @@ After execution, you get the meta-attacker model 'meta-attacker.pt'.
 
 ### Attack 2: model inversion
 ```
-python3 model_inversion_attack_main.py
+python3 model_inversion_attack_main3.py
 ```
 After execution, you get the inversion model 'inversion.pt'.
 

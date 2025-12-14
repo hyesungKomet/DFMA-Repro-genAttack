@@ -15,6 +15,7 @@
 **/images/
 
 # image directories
+data/
 cifar10/data/
 cifar10/generated_data (stable_diffusion)/
 cifar10/generated_data_SD1.5/
