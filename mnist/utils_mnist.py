@@ -178,23 +178,26 @@ def calculate_test_accuracy(model, data_loader):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-    accuracy = 100 * correct / total
-    print('Accuracy:',accuracy)
+    accuracy = 100 * correct / total if total > 0 else 0.0
+    print('Accuracy:', accuracy)
+    return accuracy
 
 def calculate_agreement_accuracy(one_model,two_model,one_dataloader):
-    one_model.cuda()
+    one_model.to(device)
     one_model.eval()
+    two_model.to(device)
     two_model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
         for images, labels in one_dataloader:
-            images, labels = images.cuda(), labels.cuda()
+            images, labels = images.to(device), labels.to(device)
             outputs = one_model(images)
-            ano_outputs=two_model(images)
+            ano_outputs = two_model(images)
             _, predicted = torch.max(outputs.data, 1)
             _, ano_predicted = torch.max(ano_outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == ano_predicted).sum().item()
-    accuracy = 100 * correct / total
-    print('Agreement:',accuracy)
+    accuracy = 100 * correct / total if total > 0 else 0.0
+    print('Agreement:', accuracy)
+    return accuracy

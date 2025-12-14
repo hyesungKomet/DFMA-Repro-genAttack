@@ -18,12 +18,12 @@ python3 train_large.py
 After execution, you get two generative models, i.e., 'netG_malignant.pt' and 'netG_benign.pt'.
 The first model can craft malignant skin images, and the second model can craft benign skin images.
 
-### Step 2: Generate data points with augmentation
+### Step 2: Generate data points with augmentation & apply filtering
 ```
-python3 generate_data.py
+python3 create_stealing_set.py
 ```
 After execution, you train an autoencoder as the enhancement model.
-Then, you can obtain the generated dataset 'generated_data.pt' and 'generated_label.pt'
+Then, you can obtain the generated dataset `./stealing_set_GAN/generated_data.pt` and `./stealing_set_GAN/generated_label.pt`
 
 ## Three privacy attacks based on the generated dataset
 
@@ -31,7 +31,7 @@ Then, you can obtain the generated dataset 'generated_data.pt' and 'generated_la
 ```
 python3 model_extraction_attack_main.py
 ```
-After execution, you get the stealing model 'steal_model.pt'.
+After execution, you get the stealing model on `./results/vgg16_extraction_GAN_filtered`
 
 ### Attack 1: membership inference
 ```
@@ -41,7 +41,7 @@ After execution, you get the meta-attacker model 'meta-attacker.pt'.
 
 ### Attack 2: model inversion
 ```
-python3 model_inversion_attack_main.py
+python3 model_inversion_attack_main2.py
 ```
 After execution, you get the inversion model 'inversion.pt'.
 
